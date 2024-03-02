@@ -1,6 +1,8 @@
 ﻿using OgrenciBilgiSistemi.Business.Interface;
-using OgrenciBilgiSistemi.Core.Helpers;
 using OgrenciBilgiSistemi.Core.Result;
+using OgrenciBilgiSistemi.Core.Security.Dto;
+using OgrenciBilgiSistemi.Core.Security.Helpers;
+using OgrenciBilgiSistemi.Dal.Interface;
 using OgrenciBilgiSistemi.Entity.Dtos.User.Request;
 using OgrenciBilgiSistemi.Entity.Entitites;
 using System;
@@ -14,10 +16,54 @@ namespace OgrenciBilgiSistemi.Business.Concrete
     public class AuthService : IAuthService
     {
         private readonly IUserService _userService;
+        private readonly ITokenHelper _tokenHelper;
+        private readonly IUserSessionDal _userSessionDal;
 
-        public AuthService(IUserService userService)
+        public AuthService(IUserService userService, ITokenHelper tokenHelper, IUserSessionDal userSessionDal)
         {
             _userService = userService;
+            _tokenHelper = tokenHelper;
+            _userSessionDal = userSessionDal;
+        }
+
+        public IDataResult<AccessToken> CreateToken(int userId)
+        {
+            try
+            {
+                var user = _userService.GetById(userId);
+
+                var userDto = new UserDto()
+                {
+                    Id = user.Data.Id,
+                    Email = user.Data.Email
+                };
+
+                //aşağıdaki sessionAddDto içinde hashlenmiş token değeri ve userId tutmaktadır
+                var sessionAddDto = _tokenHelper.CreateNewToken(userDto);
+
+                var userSession = new UserSession()
+                {
+                    Token = sessionAddDto.TokenString,
+                    UserId = sessionAddDto.UserId,
+                    CreatedDate = DateTime.Now,
+                    ExpireDate = DateTime.Now.AddDays(1)
+                };
+
+                _userSessionDal.Add(userSession);
+
+                var accessToken = new AccessToken()
+                {
+                    Expiration = userSession.ExpireDate,
+                    Token = userSession.Token
+                };
+
+                return new SuccessDataResult<AccessToken>(accessToken, "Ok");
+            }
+            catch (Exception e)
+            {
+                return new ErrorDataResult<AccessToken>(new AccessToken(), e.Message);
+            }
+          
         }
 
         public IDataResult<bool> LoginForUser(LoginDto loginDto)

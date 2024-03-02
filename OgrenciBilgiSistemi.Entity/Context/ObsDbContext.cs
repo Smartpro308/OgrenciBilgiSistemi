@@ -21,5 +21,6 @@ namespace OgrenciBilgiSistemi.Entity.Context
         public DbSet<Student> Students { get; set; }
         public DbSet<StudentCourse> StudentCourses { get; set; }
         public DbSet<LecturerCourse> LecturerCourses { get; set; }
+        public DbSet<UserSession> UserSessions { get; set; }
     }
 }

@@ -12,5 +12,8 @@ namespace OgrenciBilgiSistemi.Entity.Entitites
         public int Id { get; set; }
         public int StudentId { get; set; }
         public int CourseId { get; set; }
+        public DateTime CreatedDate { get; set; }
+        public DateTime UpdatedDate { get; set; }
+        public bool IsActive { get; set; }
     }
 }

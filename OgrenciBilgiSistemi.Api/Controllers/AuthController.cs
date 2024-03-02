@@ -31,6 +31,11 @@ namespace OgrenciBilgiSistemi.Api.Controllers
             return Ok(result);
         }
 
-
+        [HttpPost("createToken")]
+        public IActionResult CreateToken(int userId)
+        {
+            var result = _authService.CreateToken(userId);
+            return Ok(result);
+        }
     }
 }

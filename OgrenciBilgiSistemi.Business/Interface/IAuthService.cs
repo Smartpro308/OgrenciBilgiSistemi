@@ -1,4 +1,5 @@
 ﻿using OgrenciBilgiSistemi.Core.Result;
+using OgrenciBilgiSistemi.Core.Security.Dto;
 using OgrenciBilgiSistemi.Entity.Dtos.User.Request;
 using System;
 using System.Collections.Generic;
@@ -12,6 +13,7 @@ namespace OgrenciBilgiSistemi.Business.Interface
     {
         IDataResult<bool> LoginForUser(LoginDto loginDto);
         IDataResult<bool> RegisterForUser(RegisterDto registerDto);
+        IDataResult<AccessToken> CreateToken(int userId);
 
     }
 }

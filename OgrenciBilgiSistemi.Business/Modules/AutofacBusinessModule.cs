@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using OgrenciBilgiSistemi.Business.Concrete;
 using OgrenciBilgiSistemi.Business.Interface;
+using OgrenciBilgiSistemi.Core.Security.Helpers;
 using OgrenciBilgiSistemi.Dal.Concrete;
 using OgrenciBilgiSistemi.Dal.Interface;
 using System;
@@ -22,6 +23,8 @@ namespace OgrenciBilgiSistemi.Business.Modules
             builder.RegisterType<StudentDal>().As<IStudentDal>().SingleInstance();
             builder.RegisterType<LecturerCourseDal>().As<ILecturerCourseDal>().SingleInstance();
             builder.RegisterType<StudentCourseDal>().As<IStudentCourseDal>().SingleInstance();
+            builder.RegisterType<UserSessionDal>().As<IUserSessionDal>().SingleInstance();
+            builder.RegisterType<TokenHelper>().As<ITokenHelper>().SingleInstance();
 
             //Service
             builder.RegisterType<UserService>().As<IUserService>().SingleInstance();

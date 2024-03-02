@@ -1,5 +1,4 @@
 ﻿using OgrenciBilgiSistemi.Business.Interface;
-using OgrenciBilgiSistemi.Core.Helpers;
 using OgrenciBilgiSistemi.Core.Result;
 using OgrenciBilgiSistemi.Dal.Interface;
 using OgrenciBilgiSistemi.Entity.Base;
