@@ -29,6 +29,8 @@ namespace OgrenciBilgiSistemi.Business.Modules
             //Service
             builder.RegisterType<UserService>().As<IUserService>().SingleInstance();
             builder.RegisterType<AuthService>().As<IAuthService>().SingleInstance();
+            builder.RegisterType<StudentService>().As<IStudentService>().SingleInstance();
+            builder.RegisterType<LecturerService>().As<ILecturerService>().SingleInstance();
 
 
         }

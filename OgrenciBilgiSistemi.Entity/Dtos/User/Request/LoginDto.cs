@@ -11,5 +11,6 @@ namespace OgrenciBilgiSistemi.Entity.Dtos.User.Request
     {
         public string Email { get; set; }
         public string Password { get; set; }
+        public byte UserType { get; set; }
     }
 }

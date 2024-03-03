@@ -11,8 +11,10 @@ namespace OgrenciBilgiSistemi.Entity.Entitites
     {
         public int Id { get; set; }
         public string Token { get; set; }
-        public int UserId { get; set; }
+        public int ApplicationUserId { get; set; }
         public DateTime CreatedDate { get; set; }
         public DateTime ExpireDate { get; set; }
+        public byte ApplicationUserType { get; set; }
+
     }
 }

@@ -2,31 +2,31 @@
 using OgrenciBilgiSistemi.Core.Result;
 using OgrenciBilgiSistemi.Core.Security.Dto;
 using OgrenciBilgiSistemi.Core.Security.Helpers;
+using OgrenciBilgiSistemi.Core.Utilities.Enum;
 using OgrenciBilgiSistemi.Dal.Interface;
 using OgrenciBilgiSistemi.Entity.Dtos.User.Request;
 using OgrenciBilgiSistemi.Entity.Entitites;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace OgrenciBilgiSistemi.Business.Concrete
 {
     public class AuthService : IAuthService
     {
         private readonly IUserService _userService;
+        private readonly IStudentService _studentService;
+        private readonly ILecturerService _lecturerService;
         private readonly ITokenHelper _tokenHelper;
         private readonly IUserSessionDal _userSessionDal;
 
-        public AuthService(IUserService userService, ITokenHelper tokenHelper, IUserSessionDal userSessionDal)
+        public AuthService(IUserService userService, ITokenHelper tokenHelper, IUserSessionDal userSessionDal, IStudentService studentService, ILecturerService lecturerService)
         {
             _userService = userService;
             _tokenHelper = tokenHelper;
             _userSessionDal = userSessionDal;
+            _studentService = studentService;
+            _lecturerService = lecturerService;
         }
 
-        public IDataResult<AccessToken> CreateToken(int userId)
+        public IDataResult<AccessToken> CreateToken(int userId, byte userType)
         {
             try
             {
@@ -41,14 +41,21 @@ namespace OgrenciBilgiSistemi.Business.Concrete
                 //aşağıdaki sessionAddDto içinde hashlenmiş token değeri ve userId tutmaktadır
                 var sessionAddDto = _tokenHelper.CreateNewToken(userDto);
 
+                if (userType < 0 || userType > 2)
+                {
+                    return new ErrorDataResult<AccessToken>(new AccessToken(), "Kullanıcı tipi bulunamadı");
+                }
+
+
                 var userSession = new UserSession()
                 {
                     Token = sessionAddDto.TokenString,
-                    UserId = sessionAddDto.UserId,
+                    ApplicationUserId = sessionAddDto.UserId,
                     CreatedDate = DateTime.Now,
-                    ExpireDate = DateTime.Now.AddDays(1)
+                    ExpireDate = DateTime.Now.AddDays(1),
+                    ApplicationUserType = userType
                 };
-
+                
                 _userSessionDal.Add(userSession);
 
                 var accessToken = new AccessToken()
@@ -66,7 +73,7 @@ namespace OgrenciBilgiSistemi.Business.Concrete
           
         }
 
-        public IDataResult<bool> LoginForUser(LoginDto loginDto)
+        public IDataResult<bool> Login(LoginDto loginDto)
         {
             try
             {
@@ -75,21 +82,34 @@ namespace OgrenciBilgiSistemi.Business.Concrete
                     return new ErrorDataResult<bool>(false, "Lütfen tüm bilgilerinizi eksiksiz doldurun.");
                 }
 
-                var user = _userService.GetByFilter(x => x.Email == loginDto.Email);
-
-                if (user == null)
+                if (loginDto.UserType < 0 || loginDto.UserType> 2)
                 {
-                    return new ErrorDataResult<bool>(false, "Bu maile sahip kullanıcı bulunmamaktadır.");
+                    return new ErrorDataResult<bool>(false, "Kullanıcı tipi bulunamadı");
                 }
 
-                var verify = HashingHelper.VerifyPasswordHash(loginDto.Password, user.Data.PasswordSalt, user.Data.PasswordHash);
 
-                if (!verify)
+                IDataResult<bool> result;
+
+                if (loginDto.UserType == (byte)UserTypeEnum.User)
                 {
-                    return new ErrorDataResult<bool>(false, "Şifreniz yanlış!");
+                    var user = _userService.GetByFilter(x => x.Email == loginDto.Email).Data;
+
+                    result = CheckUserAndCreateToken(true, loginDto, null, user);
+                }
+                else if (loginDto.UserType == (byte)UserTypeEnum.Student)
+                {
+                    var student = _studentService.GetByFilter(x => x.Email == loginDto.Email).Data;
+
+                    result = CheckStudentAndCreateToken(true, loginDto, null, student);
+                }
+                else
+                {
+                    var lecturer = _lecturerService.GetByFilter(x => x.Email == loginDto.Email).Data;
+
+                    result = CheckLecturerAndCreateToken(true, loginDto, null, lecturer);
                 }
 
-                return new SuccessDataResult<bool>(true, "Ok");
+                return result;
             }
             catch (Exception e)
             {
@@ -97,20 +117,191 @@ namespace OgrenciBilgiSistemi.Business.Concrete
             }
         }
 
-        public IDataResult<bool> RegisterForUser(RegisterDto registerDto)
+        private IDataResult<bool> CheckUserAndCreateToken(bool isLogin, LoginDto loginDto = null, RegisterDto registerDto = null, User user = null, byte[] passwordSalt = null, byte[] passwordHash = null)
+        {
+            if (isLogin)
+            {
+                if (user == null)
+                {
+                    return new ErrorDataResult<bool>(false, "Bu maile sahip kullanıcı bulunmamaktadır.");
+                }
+
+                var verify = HashingHelper.VerifyPasswordHash(loginDto.Password, user.PasswordSalt, user.PasswordHash);
+
+                if (!verify)
+                {
+                    return new ErrorDataResult<bool>(false, "Şifreniz yanlış!");
+                }
+
+                var createToken = CreateToken(user.Id, loginDto.UserType);
+
+                if (createToken.Success == false)
+                {
+                    return new ErrorDataResult<bool>(false, createToken.Message);
+                }
+
+            }
+            else
+            {
+                var checkUser = _userService.GetByFilter(x => x.Email == registerDto.Email);
+
+                if (checkUser != null)
+                {
+                    return new ErrorDataResult<bool>(false, "Bu maile sahip bir kullanıcı zaten var.");
+                }
+
+
+                User newUser = new User
+                {
+                    Name = registerDto.Name,
+                    Surname = registerDto.Surname,
+                    CreatedDate = DateTime.UtcNow,
+                    PasswordHash = passwordHash,
+                    PasswordSalt = passwordSalt,
+                    Email = registerDto.Email,
+                    IsActive = true
+                };
+
+                _userService.Add(newUser);
+
+                var createToken = CreateToken(newUser.Id, registerDto.UserType);
+
+                if (createToken.Success == false)
+                {
+                    return new ErrorDataResult<bool>(false, createToken.Message);
+                }
+
+            }
+
+            return new SuccessDataResult<bool>(true, "Ok");
+        }
+
+        private IDataResult<bool> CheckStudentAndCreateToken(bool isLogin, LoginDto loginDto = null, RegisterDto registerDto = null, Student student = null, byte[] passwordSalt = null, byte[] passwordHash = null)
+        {
+            if (isLogin)
+            {
+                if (student == null)
+                {
+                    return new ErrorDataResult<bool>(false, "Bu maile sahip kullanıcı bulunmamaktadır.");
+                }
+
+                var verify = HashingHelper.VerifyPasswordHash(loginDto.Password, student.PasswordSalt, student.PasswordHash);
+
+                if (!verify)
+                {
+                    return new ErrorDataResult<bool>(false, "Şifreniz yanlış!");
+                }
+
+                var createToken = CreateToken(student.Id, loginDto.UserType);
+
+                if (createToken.Success == false)
+                {
+                    return new ErrorDataResult<bool>(false, createToken.Message);
+                }
+
+            }
+            else
+            {
+                var checkStudent = _userService.GetByFilter(x => x.Email == registerDto.Email);
+
+                if (checkStudent != null)
+                {
+                    return new ErrorDataResult<bool>(false, "Bu maile sahip bir öğrenci zaten var.");
+                }
+
+
+                Student newStudent = new Student
+                {
+                    Name = registerDto.Name,
+                    Surname = registerDto.Surname,
+                    CreatedDate = DateTime.UtcNow,
+                    PasswordHash = passwordHash,
+                    PasswordSalt = passwordSalt,
+                    Email = registerDto.Email,
+                    IsActive = true
+                };
+
+                _studentService.Add(newStudent);
+
+                var createToken = CreateToken(newStudent.Id, registerDto.UserType);
+
+                if (createToken.Success == false)
+                {
+                    return new ErrorDataResult<bool>(false, createToken.Message);
+                }
+
+            }
+
+            return new SuccessDataResult<bool>(true, "Ok");
+
+        }
+
+        private IDataResult<bool> CheckLecturerAndCreateToken(bool isLogin, LoginDto loginDto = null, RegisterDto registerDto = null, Lecturer lecturer = null, byte[] passwordSalt = null, byte[] passwordHash = null)
+        {
+            if (isLogin)
+            {
+                if (lecturer == null)
+                {
+                    return new ErrorDataResult<bool>(false, "Bu maile sahip öğretmen bulunmamaktadır.");
+                }
+
+                var verify = HashingHelper.VerifyPasswordHash(loginDto.Password, lecturer.PasswordSalt, lecturer.PasswordHash);
+
+                if (!verify)
+                {
+                    return new ErrorDataResult<bool>(false, "Şifreniz yanlış!");
+                }
+
+                var createToken = CreateToken(lecturer.Id, loginDto.UserType);
+
+                if (createToken.Success == false)
+                {
+                    return new ErrorDataResult<bool>(false, createToken.Message);
+                }
+
+            }
+            else
+            {
+                var checkLecturer = _userService.GetByFilter(x => x.Email == registerDto.Email);
+
+                if (checkLecturer != null)
+                {
+                    return new ErrorDataResult<bool>(false, "Bu maile sahip bir öğrenci zaten var.");
+                }
+
+
+                Lecturer newLecturer = new Lecturer
+                {
+                    Name = registerDto.Name,
+                    Surname = registerDto.Surname,
+                    CreatedDate = DateTime.UtcNow,
+                    PasswordHash = passwordHash,
+                    PasswordSalt = passwordSalt,
+                    Email = registerDto.Email,
+                    IsActive = true
+                };
+
+                _lecturerService.Add(newLecturer);
+
+                var createToken = CreateToken(newLecturer.Id, registerDto.UserType);
+
+                if (createToken.Success == false)
+                {
+                    return new ErrorDataResult<bool>(false, createToken.Message);
+                }
+            }
+
+            return new SuccessDataResult<bool>(true, "Ok");
+        }
+
+
+        public IDataResult<bool> Register(RegisterDto registerDto)
         {
             try
             {
                 if (registerDto.Name == null || registerDto.Surname == null || registerDto.Email == null || registerDto.Password == null)
                 {
                     return new ErrorDataResult<bool>(false, "Lütfen tüm bilgilerinizi eksiksiz doldurun.");
-                }
-
-                var checkUser = _userService.GetByFilter(x => x.Email == registerDto.Email);
-
-                if (checkUser != null)
-                {
-                    return new ErrorDataResult<bool>(false, "Bu maile sahip bir kullanıcı zaten var.");
                 }
 
                 if (registerDto.Password.Contains(registerDto.Name.Trim()))
@@ -137,20 +328,28 @@ namespace OgrenciBilgiSistemi.Business.Concrete
 
                 HashingHelper.CreatePasswordHash(registerDto.Password, out passwordSalt, out passwordHash);
 
-                User user = new User
+
+                if (registerDto.UserType < 0 || registerDto.UserType > 2)
                 {
-                    Name = registerDto.Name,
-                    Surname = registerDto.Surname,
-                    CreatedDate = DateTime.UtcNow,
-                    PasswordHash = passwordHash,
-                    PasswordSalt = passwordSalt,
-                    Email = registerDto.Email,
-                    IsActive = true
-                };
+                    return new ErrorDataResult<bool>(false, "Kullanıcı tipi bulunamadı");
+                }
 
-                _userService.Add(user);
+                IDataResult<bool> result;
 
-                return new SuccessDataResult<bool>(true, "Kayıt gerçekleşti!");
+                if (registerDto.UserType == (byte)UserTypeEnum.User)
+                {
+                    result = CheckUserAndCreateToken(false, null, registerDto, null, passwordSalt, passwordHash);
+                }
+                else if (registerDto.UserType == (byte)UserTypeEnum.Student)
+                {
+                    result = CheckStudentAndCreateToken(false, null, registerDto, null, passwordSalt, passwordHash);
+                }
+                else
+                {
+                    result = CheckLecturerAndCreateToken(false, null, registerDto, null, passwordSalt, passwordHash);
+                }
+
+                return result;
             }
             catch (Exception e)
             {

@@ -11,9 +11,9 @@ namespace OgrenciBilgiSistemi.Business.Interface
 {
     public interface IAuthService
     {
-        IDataResult<bool> LoginForUser(LoginDto loginDto);
-        IDataResult<bool> RegisterForUser(RegisterDto registerDto);
-        IDataResult<AccessToken> CreateToken(int userId);
+        IDataResult<bool> Login(LoginDto loginDto);
+        IDataResult<bool> Register(RegisterDto registerDto);
+        IDataResult<AccessToken> CreateToken(int userId, byte userType);
 
     }
 }
